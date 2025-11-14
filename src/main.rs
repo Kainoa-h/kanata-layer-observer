@@ -152,18 +152,29 @@ fn main() {
     // Get port (CLI overrides config)
     let port = args.port.unwrap_or(config.port);
 
-    log::debug!("attempting to connect to kanata on port {}", port);
-    let kanata_conn = TcpStream::connect_timeout(
-        &SocketAddr::from(([127, 0, 0, 1], port)),
-        Duration::from_secs(5),
-    )
-    .expect("connect to kanata");
-    log::debug!("successfully connected");
-    let reader_stream = kanata_conn;
-    read_from_kanata(reader_stream, &config.script_path);
+    // Connect with retry logic
+    loop {
+        log::info!("attempting to connect to kanata on port {}", port);
+        match TcpStream::connect_timeout(
+            &SocketAddr::from(([127, 0, 0, 1], port)),
+            Duration::from_secs(5),
+        ) {
+            Ok(conn) => {
+                log::info!("successfully connected to kanata");
+                if let Err(e) = read_from_kanata(conn, &config.script_path) {
+                    log::error!("connection lost: {}. retrying in 30 seconds...", e);
+                    std::thread::sleep(Duration::from_secs(30));
+                }
+            }
+            Err(e) => {
+                log::error!("failed to connect to kanata: {}. retrying in 30 seconds...", e);
+                std::thread::sleep(Duration::from_secs(30));
+            }
+        }
+    }
 }
 
-fn read_from_kanata(s: TcpStream, script_path: &str) {
+fn read_from_kanata(s: TcpStream, script_path: &str) -> std::io::Result<()> {
     log::debug!("reader starting");
     let mut reader = BufReader::new(s);
     let mut msg = String::new();
@@ -173,7 +184,16 @@ fn read_from_kanata(s: TcpStream, script_path: &str) {
 
     loop {
         msg.clear();
-        reader.read_line(&mut msg).expect("stream readable");
+        let bytes_read = reader.read_line(&mut msg)?;
+
+        // Connection closed
+        if bytes_read == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::ConnectionReset,
+                "connection closed by kanata"
+            ));
+        }
+
         log::debug!("message received");
 
         if let Ok(ServerMessage::LayerChange { new }) = serde_json::from_str::<ServerMessage>(&msg)
