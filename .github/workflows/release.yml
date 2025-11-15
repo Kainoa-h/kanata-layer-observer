@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
@@ -27,20 +27,20 @@ jobs:
       - name: Create tarball
         run: |
           cd target/release
-          tar czf kanata_layer_observer-${{ steps.version.outputs.VERSION }}-macos-aarch64.tar.gz kanata_layer_observer
+          tar czf kanata-layer-observer-${{ steps.version.outputs.VERSION }}-macos-aarch64.tar.gz kanata-layer-observer
           cd ../..
 
       - name: Calculate SHA256
         id: sha
         run: |
-          SHA=$(shasum -a 256 target/release/kanata_layer_observer-${{ steps.version.outputs.VERSION }}-macos-aarch64.tar.gz | cut -d ' ' -f 1)
+          SHA=$(shasum -a 256 target/release/kanata-layer-observer-${{ steps.version.outputs.VERSION }}-macos-aarch64.tar.gz | cut -d ' ' -f 1)
           echo "SHA256=$SHA" >> $GITHUB_OUTPUT
           echo "SHA256: $SHA"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: target/release/kanata_layer_observer-${{ steps.version.outputs.VERSION }}-macos-aarch64.tar.gz
+          files: target/release/kanata-layer-observer-${{ steps.version.outputs.VERSION }}-macos-aarch64.tar.gz
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
