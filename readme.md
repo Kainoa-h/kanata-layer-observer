@@ -8,10 +8,8 @@ This is just so i can have a simple service to reflect my current kanata layout 
 
 ```bash
 brew tap kainoa-h/tap
-brew install --build-from-source kanata-layer-observer
+brew install kanata-layer-observer
 ```
-
-It's not actually building from source, i just haven't made a brew bottle thingy yet
 
 ## TOML config
 
