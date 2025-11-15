@@ -1,5 +1,5 @@
 [package]
-name = "kanata_layer_observer"
+name = "kanata-layer-observer"
 description = "Observes kanata layer changes and runs a shell script"
 version = "1.0.0"
 edition = "2021"
@@ -15,4 +15,3 @@ serde_json = "1"
 shellexpand = "3"
 simplelog = "0.12"
 toml = "0.9"
-
