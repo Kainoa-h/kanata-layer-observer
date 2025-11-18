@@ -44,7 +44,7 @@ fn default_log_level() -> String {
 fn create_default_config(path: &str) -> std::io::Result<Config> {
     let default_config = Config {
         port: 5829,
-        script_path: "~/.config/kanata_observer/layer_change.sh".to_string(),
+        script_path: "~/.config/kanata-observer/layer_change.sh".to_string(),
         log_level: "info".to_string(),
     };
 
@@ -80,7 +80,7 @@ log_level = "{}"
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// Path to configuration file
-    #[clap(short, long, default_value = "~/.config/kanata_observer/config.toml")]
+    #[clap(short, long, default_value = "~/.config/kanata-observer/config.toml")]
     config: String,
 
     /// Port that kanata's TCP server is listening on (overrides config file)
@@ -167,7 +167,10 @@ fn main() {
                 }
             }
             Err(e) => {
-                log::error!("failed to connect to kanata: {}. retrying in 30 seconds...", e);
+                log::error!(
+                    "failed to connect to kanata: {}. retrying in 30 seconds...",
+                    e
+                );
                 std::thread::sleep(Duration::from_secs(30));
             }
         }
@@ -190,7 +193,7 @@ fn read_from_kanata(s: TcpStream, script_path: &str) -> std::io::Result<()> {
         if bytes_read == 0 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::ConnectionReset,
-                "connection closed by kanata"
+                "connection closed by kanata",
             ));
         }
 

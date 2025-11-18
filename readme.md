@@ -13,7 +13,7 @@ brew install kanata-layer-observer
 
 ## TOML config
 
-The service reads the TOML config from `~/.config/kanata_observer/tcp_client.toml`
+The service reads the TOML config from `~/.config/kanata-observer/config.toml`
 
 If the config doesn't exist, it will be created automatically with default values on first run.
 
@@ -26,7 +26,7 @@ port = 1012
 
 # Path to the script to execute on layer change
 # The layer name will be passed as the first argument
-script_path = "~/.config/kanata_observer/layer_change.sh"
+script_path = "~/.config/kanata-observer/layer_change.sh"
 
 # Log level: "info", "debug", or "trace"
 log_level = "info"
