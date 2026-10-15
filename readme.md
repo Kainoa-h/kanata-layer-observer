@@ -1,6 +1,6 @@
 # Kanata layer observer
 
-Observes kanata layer changes and triggers the script specified in the TOML config
+Observes Kanata TCP connection status and layer changes, and triggers the script specified in the TOML config.
 
 This is just so i can have a simple service to reflect my current kanata layout in my sketchybar
 
@@ -71,8 +71,8 @@ Example config:
 # Port that kanata's TCP server is listening on
 port = 1012
 
-# Path to the script to execute on layer change
-# The layer name will be passed as the first argument
+# Path to the script to execute on connection and layer changes
+# One argument: current layer when connected, empty string when disconnected
 script_path = "~/.config/kanata-observer/layer_change.sh"
 
 # Log level: "none", "info", "debug", or "trace"
@@ -80,6 +80,48 @@ log_level = "none"
 
 # Seconds to wait before retrying a failed or lost connection (default: 5)
 retry_seconds = 5
+```
+
+## Script API
+
+The observer executes `script_path` directly with one argument, `$1`:
+
+| Value of `$1` | Meaning |
+| --- | --- |
+| Nonempty layer name | Connected; this is the current layer |
+| Empty string (`""`) | Disconnected |
+
+On each successful TCP connection, including reconnections, the observer will request the current active layer from Kanata and call the script. Subsequent `LayerChange` messages invoke the script with the new layer name as before. This uses Kanata's [TCP query protocol](https://jtroo.github.io/config.html); your Kanata version must support `RequestCurrentLayerName` to report the layer immediately after connecting.
+If the query is unsupported or unanswered, layer-change callbacks still work,
+but the initial layer notification must come from a layer change.
+
+When the connection closes or encounters a read/write error, the
+script is called with an empty layer name. Failed connection attempts do not repeat this callback. Before the first successful connection and layer message, status is unknown. Stopping the observer does not emit a disconnect callback. Connection status reflects TCP connectivity, not a check for a running Kanata process.
+
+Empty layer names are reserved for disconnected status and are thus substituted for 'noname' if received from Kanata.
+
+Callbacks run synchronously in order; keep them short because a slow script
+delays socket reads, disconnect detection, and reconnection. Script launch errors and nonzero exits are logged according to `log_level`.
+Arguments are passed literally, without shell interpolation.
+
+Example POSIX shell script for macOS and Linux:
+
+```sh
+#!/bin/sh
+
+layer=${1-}
+
+if [ -n "$layer" ]; then
+    # Update your connected status and layer indicator.
+else
+    # Show disconnected status and clear any stale layer indicator.
+fi
+```
+
+Save the script at the configured `script_path` and ensure it is executable:
+
+```sh
+chmod +x "$HOME/.config/kanata-observer/layer_change.sh"
 ```
 
 ## Kanata setup

@@ -1,7 +1,7 @@
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::process::{exit, Command};
 use std::time::Duration;
@@ -29,7 +29,7 @@ struct Config {
     /// Port that kanata's TCP server is listening on
     port: u16,
 
-    /// Path to the script to execute on layer change
+    /// Path to the script to execute on connection and layer changes
     script_path: String,
 
     /// Log level: "none", "info", "debug", or "trace"
@@ -63,8 +63,8 @@ fn create_default_config(path: &str) -> std::io::Result<Config> {
 # Port that kanata's TCP server is listening on
 port = {}
 
-# Path to the script to execute on layer change
-# The layer name will be passed as the first argument
+# Path to the script to execute on connection and layer changes
+# One argument: current layer when connected, empty string when disconnected
 script_path = "{}"
 
 # Log level: "none", "info", "debug", or "trace"
@@ -178,7 +178,7 @@ fn main() {
         ) {
             Ok(conn) => {
                 log::info!("successfully connected to kanata");
-                if let Err(e) = read_from_kanata(conn, &config.script_path) {
+                if let Err(e) = observe_connection(conn, &config.script_path) {
                     log::error!(
                         "connection lost: {}. retrying in {} seconds...",
                         e,
@@ -199,13 +199,35 @@ fn main() {
     }
 }
 
+fn observe_connection(mut s: TcpStream, script_path: &str) -> std::io::Result<()> {
+    // Query on every connection so scripts need not wait for a layer change.
+    let result = s
+        .write_all(b"{\"RequestCurrentLayerName\":{}}\n")
+        .and_then(|()| read_from_kanata(s, script_path));
+    run_script(script_path, "");
+    result
+}
+
+fn run_script(script_path: &str, layer: &str) {
+    let expanded_script_path = shellexpand::tilde(script_path);
+    match Command::new(expanded_script_path.as_ref())
+        .arg(layer)
+        .output()
+    {
+        Ok(output) if output.status.success() => log::debug!("Script executed successfully"),
+        Ok(output) => log::error!(
+            "Script failed ({}): {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        ),
+        Err(e) => log::error!("Failed to execute script: {}", e),
+    }
+}
+
 fn read_from_kanata(s: TcpStream, script_path: &str) -> std::io::Result<()> {
     log::debug!("reader starting");
     let mut reader = BufReader::new(s);
     let mut msg = String::new();
-
-    // Expand ~ in script path
-    let expanded_script_path = shellexpand::tilde(script_path).to_string();
 
     loop {
         msg.clear();
@@ -221,20 +243,19 @@ fn read_from_kanata(s: TcpStream, script_path: &str) -> std::io::Result<()> {
 
         log::debug!("message received");
 
-        if let Ok(ServerMessage::LayerChange { new }) = serde_json::from_str::<ServerMessage>(&msg)
-        {
-            log::debug!("Layer changed to: {}", new);
-            let out = Command::new(&expanded_script_path).arg(&new).output();
-            match out {
-                Ok(output) => {
-                    if output.status.success() {
-                        log::debug!("Script executed successfully");
-                    } else {
-                        log::error!("Script failed: {}", String::from_utf8_lossy(&output.stderr));
-                    }
+        match serde_json::from_str::<ServerMessage>(&msg) {
+            Ok(ServerMessage::LayerChange { new: name })
+            | Ok(ServerMessage::CurrentLayerName { name }) => {
+                if name.is_empty() {
+                    run_script(script_path, "noname");
+                    log::error!("Empty layer name: defaulting to 'noname'");
+                } else {
+                    run_script(script_path, &name);
+                    log::debug!("Current layer: {}", name);
                 }
-                Err(e) => log::error!("Failed to execute script: {}", e),
             }
+            Ok(ServerMessage::Error { msg }) => log::error!("Kanata error: {}", msg),
+            _ => {}
         }
     }
 }
