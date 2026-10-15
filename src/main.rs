@@ -32,7 +32,7 @@ struct Config {
     /// Path to the script to execute on layer change
     script_path: String,
 
-    /// Log level: "info", "debug", or "trace"
+    /// Log level: "none", "info", "debug", or "trace"
     #[serde(default = "default_log_level")]
     log_level: String,
 
@@ -46,14 +46,14 @@ fn default_retry_seconds() -> u64 {
 }
 
 fn default_log_level() -> String {
-    "info".to_string()
+    "none".to_string()
 }
 
 fn create_default_config(path: &str) -> std::io::Result<Config> {
     let default_config = Config {
         port: 5829,
         script_path: "~/.config/kanata-observer/layer_change.sh".to_string(),
-        log_level: "info".to_string(),
+        log_level: default_log_level(),
         retry_seconds: default_retry_seconds(),
     };
 
@@ -67,7 +67,7 @@ port = {}
 # The layer name will be passed as the first argument
 script_path = "{}"
 
-# Log level: "info", "debug", or "trace"
+# Log level: "none", "info", "debug", or "trace"
 log_level = "{}"
 
 # Seconds to wait before retrying a failed or lost connection (default: 5)
@@ -149,6 +149,7 @@ fn main() {
         simplelog::LevelFilter::Debug
     } else {
         match config.log_level.to_lowercase().as_str() {
+            "none" => simplelog::LevelFilter::Off,
             "trace" => simplelog::LevelFilter::Trace,
             "debug" => simplelog::LevelFilter::Debug,
             "info" => simplelog::LevelFilter::Info,

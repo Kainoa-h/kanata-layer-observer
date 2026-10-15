@@ -75,8 +75,8 @@ port = 1012
 # The layer name will be passed as the first argument
 script_path = "~/.config/kanata-observer/layer_change.sh"
 
-# Log level: "info", "debug", or "trace"
-log_level = "info"
+# Log level: "none", "info", "debug", or "trace"
+log_level = "none"
 
 # Seconds to wait before retrying a failed or lost connection (default: 5)
 retry_seconds = 5
