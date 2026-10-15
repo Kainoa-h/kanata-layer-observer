@@ -35,6 +35,14 @@ struct Config {
     /// Log level: "info", "debug", or "trace"
     #[serde(default = "default_log_level")]
     log_level: String,
+
+    /// Seconds to wait before reconnecting after a connection failure or disconnect
+    #[serde(default = "default_retry_seconds")]
+    retry_seconds: u64,
+}
+
+fn default_retry_seconds() -> u64 {
+    5
 }
 
 fn default_log_level() -> String {
@@ -46,6 +54,7 @@ fn create_default_config(path: &str) -> std::io::Result<Config> {
         port: 5829,
         script_path: "~/.config/kanata-observer/layer_change.sh".to_string(),
         log_level: "info".to_string(),
+        retry_seconds: default_retry_seconds(),
     };
 
     let toml_content = format!(
@@ -60,8 +69,14 @@ script_path = "{}"
 
 # Log level: "info", "debug", or "trace"
 log_level = "{}"
+
+# Seconds to wait before retrying a failed or lost connection (default: 5)
+retry_seconds = {}
 "#,
-        default_config.port, default_config.script_path, default_config.log_level
+        default_config.port,
+        default_config.script_path,
+        default_config.log_level,
+        default_config.retry_seconds
     );
 
     // Create parent directory if it doesn't exist
@@ -151,6 +166,7 @@ fn main() {
 
     // Get port (CLI overrides config)
     let port = args.port.unwrap_or(config.port);
+    let retry_delay = Duration::from_secs(config.retry_seconds);
 
     // Connect with retry logic
     loop {
@@ -162,16 +178,21 @@ fn main() {
             Ok(conn) => {
                 log::info!("successfully connected to kanata");
                 if let Err(e) = read_from_kanata(conn, &config.script_path) {
-                    log::error!("connection lost: {}. retrying in 30 seconds...", e);
-                    std::thread::sleep(Duration::from_secs(30));
+                    log::error!(
+                        "connection lost: {}. retrying in {} seconds...",
+                        e,
+                        config.retry_seconds
+                    );
+                    std::thread::sleep(retry_delay);
                 }
             }
             Err(e) => {
                 log::error!(
-                    "failed to connect to kanata: {}. retrying in 30 seconds...",
-                    e
+                    "failed to connect to kanata: {}. retrying in {} seconds...",
+                    e,
+                    config.retry_seconds
                 );
-                std::thread::sleep(Duration::from_secs(30));
+                std::thread::sleep(retry_delay);
             }
         }
     }

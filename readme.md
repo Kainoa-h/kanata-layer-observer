@@ -77,6 +77,9 @@ script_path = "~/.config/kanata-observer/layer_change.sh"
 
 # Log level: "info", "debug", or "trace"
 log_level = "info"
+
+# Seconds to wait before retrying a failed or lost connection (default: 5)
+retry_seconds = 5
 ```
 
 ## Kanata setup
